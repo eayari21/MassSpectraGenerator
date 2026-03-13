@@ -14,8 +14,8 @@ import re
 import matplotlib.pyplot as plt
 from scipy.stats import exponnorm
 
-from RSF_test import line_appear
-from utils import create_fracs
+from appearance_curve_weighting import line_appear
+from mineral_abundance_utils import create_fracs
 
 #Improve figure resolution
 plt.rcParams["figure.figsize"] = [7.50, 3.50]
@@ -81,7 +81,7 @@ class Spectra():
             self.els.append(tmp2)
         
         #Use the appearance curves to alter the spectra
-        #This functionality is taken from RSF_test
+        #This functionality is taken from appearance_curve_weighting
         
         for j in range(len(self.els)):
             new_amp_weight = line_appear(self.els[j], vel)

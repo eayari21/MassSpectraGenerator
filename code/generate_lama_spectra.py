@@ -516,17 +516,17 @@ if __name__ == "__main__":
         for idx in sorted(candidate_idx, key=lambda j: x[j]):
             xm = x[idx]
             ym = y_plot[idx]
-            ax.vlines(xm, 1e-6, ym, colors=line_color, alpha=0.2, linewidth=0.6)
-            ax.text(
-                xm,
-                ym * 1.18,
-                f"{xm:.1f}",
-                ha="center",
-                va="bottom",
-                fontsize=8,
-                color="#2f2f2f",
-                rotation=90,
-            )
+            # ax.vlines(xm, 1e-6, ym, colors=line_color, alpha=0.2, linewidth=0.6)
+            # ax.text(
+            #     xm,
+            #     ym * 1.18,
+            #     f"{xm:.1f}",
+            #     ha="center",
+            #     va="bottom",
+            #     fontsize=8,
+            #     color="#2f2f2f",
+            #     rotation=90,
+            # )
 
     output_png = f"../figures/single_mineral_spectra/{min_name}_apj.png"
     output_pdf = f"../figures/single_mineral_spectra/{min_name}_apj.pdf"

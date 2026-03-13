@@ -12,10 +12,45 @@ import pandas as pd
 import numpy as np
 import re
 import matplotlib.pyplot as plt
+from matplotlib.ticker import LogLocator, NullFormatter
 
-#Improve figure resolution
-plt.rcParams["figure.figsize"] = [7.50, 3.50]
-plt.rcParams["figure.autolayout"] = True
+# Improve figure defaults for publication output
+plt.rcParams.update({
+    "figure.figsize": (7.0, 4.4),
+    "figure.dpi": 220,
+    "savefig.dpi": 600,
+    "figure.autolayout": True,
+    "font.size": 11,
+    "axes.labelsize": 12,
+    "axes.titlesize": 13,
+    "xtick.labelsize": 10,
+    "ytick.labelsize": 10,
+    "axes.linewidth": 1.0,
+    "xtick.direction": "in",
+    "ytick.direction": "in",
+    "xtick.top": True,
+    "ytick.right": True,
+    "legend.frameon": False,
+    "mathtext.fontset": "stix",
+    "font.family": "STIXGeneral",
+})
+
+
+def configure_apj_axes(ax, xmin, xmax):
+    """Apply ApJ-like styling to a mass spectrum axis."""
+    ax.set_facecolor("white")
+    ax.set_xlim(xmin, xmax)
+    ax.set_yscale("log")
+    ax.set_xlabel(r"Mass (u)")
+    ax.set_ylabel(r"Normalized amplitude")
+
+    # Dense major/minor ticks and subtle grid for publication readability.
+    ax.yaxis.set_major_locator(LogLocator(base=10, numticks=8))
+    ax.yaxis.set_minor_locator(LogLocator(base=10, subs=np.arange(2, 10) * 0.1, numticks=90))
+    ax.yaxis.set_minor_formatter(NullFormatter())
+
+    ax.grid(which="major", axis="both", linestyle="-", linewidth=0.4, alpha=0.25)
+    ax.grid(which="minor", axis="y", linestyle=":", linewidth=0.3, alpha=0.2)
 
 #%%
 def safe_div(x,y):
@@ -451,26 +486,50 @@ def make_lama(rockarray, percentarray):
 
 
 if __name__ == "__main__":
-    
-    min_name = 'Anorthite'
-    
-    #x,y = make_lama(['Albite','Anorthite'],[200/3,100/3])
-    x,y = make_lama([min_name],[100])
-    y = y[:-62]
-    
-    #y = add_noise(y)
-    
-    plt.style.use('dark_background')
-    fig = plt.figure(dpi = 2000)
-    fig = plt.figure()
-    ax  = fig.add_subplot()
-    ax.set_yscale('log')
-    ax.set_xlabel("Mass(u)")
-    ax.set_ylabel("Amplitude")
-    ax.set_title("100% " + min_name)
-    
-    ax.plot(x,y,lw=.5,c = 'y')
-    plt.show()
-    
-    # plt.savefig("Forsterite100.eps", dpi=1200)
 
+    min_name = "Anorthite"
+
+    # x,y = make_lama(['Albite','Anorthite'], [200/3,100/3])
+    x, y = make_lama([min_name], [100])
+    y = y[:-62]
+
+    # y = add_noise(y)
+
+    # Keep strictly positive values for log-space rendering
+    y_plot = np.clip(y, 1e-6, None)
+    x_min = 0
+    x_max = float(np.nanmax(x))
+
+    fig, ax = plt.subplots()
+    configure_apj_axes(ax, x_min, x_max)
+
+    line_color = "#1f77b4"
+    ax.plot(x, y_plot, lw=1.15, c=line_color)
+
+    title = rf"{min_name} synthetic LAMA spectrum"
+    ax.set_title(title)
+
+    # Annotate strongest peaks to improve interpretation in print.
+    candidate_idx = np.where(y_plot > 0.08 * np.max(y_plot))[0]
+    if len(candidate_idx) > 0:
+        candidate_idx = candidate_idx[np.argsort(y_plot[candidate_idx])[-8:]]
+        for idx in sorted(candidate_idx, key=lambda j: x[j]):
+            xm = x[idx]
+            ym = y_plot[idx]
+            ax.vlines(xm, 1e-6, ym, colors=line_color, alpha=0.2, linewidth=0.6)
+            ax.text(
+                xm,
+                ym * 1.18,
+                f"{xm:.1f}",
+                ha="center",
+                va="bottom",
+                fontsize=8,
+                color="#2f2f2f",
+                rotation=90,
+            )
+
+    output_png = f"../figures/single_mineral_spectra/{min_name}_apj.png"
+    output_pdf = f"../figures/single_mineral_spectra/{min_name}_apj.pdf"
+    fig.savefig(output_png, bbox_inches="tight")
+    fig.savefig(output_pdf, bbox_inches="tight")
+    plt.show()

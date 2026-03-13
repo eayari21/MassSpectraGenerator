@@ -29,14 +29,14 @@ def safe_div(x,y):
 #%%
 def fetch_abundances():
 #Get full list of all elements and their corresponding symbols, masses and abundances
-    eleabund = pd.read_csv("elementabundances.csv",header = 0)
+    eleabund = pd.read_csv("../elementabundances.csv",header = 0)
     return eleabund
 
 
 #%%
 def fetch_rsfs():
 #Retreve Hillier Relative Sensitivity Factors (Taken from TOF-SIMS)
-    rsfs = pd.read_csv("rel_sens_fac.csv")
+    rsfs = pd.read_csv("../rel_sens_fac.csv")
     rsfs.columns = ['Name','Sensitivity Factor']
     return rsfs
 
@@ -44,7 +44,7 @@ def fetch_rsfs():
 #%%
 def fetch_rocks():
 #Retrieve the available elements from the heidelberg experiment and their compositions (up to 8 elements)
-    rocks = pd.read_csv("rocks.csv", header = 0,)
+    rocks = pd.read_csv("../rocks.csv", header = 0,)
     rocks.columns = ['Mineral','Element1','abundance1','Element2','abundance2','Element3','abundance3','Element4','abundance4','Element5','abundance5','Element6','abundance6','Element7','abundance7','Element8','abundance8']
     return rocks
 
@@ -470,6 +470,7 @@ if __name__ == "__main__":
     ax.set_title("100% " + min_name)
     
     ax.plot(x,y,lw=.5,c = 'y')
+    plt.show()
     
-    plt.savefig("Forsterite100.eps", dpi=1200)
+    # plt.savefig("Forsterite100.eps", dpi=1200)
 

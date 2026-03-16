@@ -84,11 +84,11 @@ def annotate_isotopes(ax, x_plot, y_plot, isotope_labels):
     if not isotope_labels:
         return
 
+    data_axes_transform = transforms.blended_transform_factory(ax.transData, ax.transAxes)
     top_y = ax.get_ylim()[1]
     base_label_y_axes = 1.02
     tick_fontsize = plt.rcParams.get("xtick.labelsize", 10)
     x_min, x_max = ax.get_xlim()
-    x_span = max(x_max - x_min, 1.0)
 
     sorted_labels = sorted(isotope_labels, key=lambda iso: iso["mass"])
     min_sep = 2.3  # minimum horizontal spacing in u between neighboring labels
@@ -104,25 +104,23 @@ def annotate_isotopes(ax, x_plot, y_plot, isotope_labels):
     if overflow > 0:
         label_x_positions = [max(x_min + 0.4, x - overflow) for x in label_x_positions]
 
-    n_rows = 4
-    row_step = 0.06
     for idx, iso in enumerate(sorted_labels):
         mass = iso["mass"]
         label = iso["label"]
         label_x = label_x_positions[idx]
-        row = idx % n_rows
-        label_y_axes = base_label_y_axes + row * row_step
+        label_y_axes = base_label_y_axes
         idx = int(np.argmin(np.abs(x_plot - mass)))
         peak_y = y_plot[idx]
         ax.vlines(mass, peak_y, top_y, color="#5a5a5a", linewidth=0.5, alpha=0.7)
-        if abs(label_x - mass) > 0.03 * x_span:
-            ax.plot(
-                [mass, label_x],
-                [top_y, top_y * 1.02],
-                color="#5a5a5a",
-                linewidth=0.5,
-                alpha=0.7,
-            )
+        ax.plot(
+            [mass, label_x],
+            [1.0, label_y_axes],
+            color="#5a5a5a",
+            linewidth=0.5,
+            alpha=0.7,
+            transform=data_axes_transform,
+            clip_on=False,
+        )
         ax.text(
             label_x,
             label_y_axes,
@@ -132,7 +130,7 @@ def annotate_isotopes(ax, x_plot, y_plot, isotope_labels):
             fontsize=tick_fontsize,
             rotation=90,
             color="#3a3a3a",
-            transform=ax.get_xaxis_transform(),
+            transform=data_axes_transform,
             clip_on=False,
         )
 

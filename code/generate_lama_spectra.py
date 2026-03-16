@@ -91,7 +91,7 @@ def annotate_isotopes(ax, x_plot, y_plot, isotope_labels):
     x_span = max(x_max - x_min, 1.0)
 
     sorted_labels = sorted(isotope_labels, key=lambda iso: iso["mass"])
-    min_sep = 1.8  # minimum horizontal spacing in u between neighboring labels
+    min_sep = 2.3  # minimum horizontal spacing in u between neighboring labels
     label_x_positions = []
     for idx, iso in enumerate(sorted_labels):
         label_x = float(np.clip(iso["mass"], x_min + 0.4, x_max - 0.4))

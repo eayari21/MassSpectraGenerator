@@ -12,6 +12,7 @@ import pandas as pd
 import numpy as np
 import re
 import matplotlib.pyplot as plt
+from matplotlib import transforms
 from matplotlib.ticker import LogLocator, NullFormatter
 from collections import defaultdict
 
@@ -266,35 +267,35 @@ def make_lama(rockarray, percentarray, velocity_kms=None):
        if not (min_pres['Element1'].empty):
           elems_present.append(str(min_pres['Element1']))
        if not (min_pres['abundance1'].empty):
-          pres_abunds.append(float(min_pres['abundance1'] + (percentarray_s[i]*min_pres['abundance1'])))
+          pres_abunds.append(float((min_pres['abundance1'] + (percentarray_s[i]*min_pres['abundance1'])).iloc[0]))
        if not (min_pres['Element2'].empty):
           elems_present.append(str(min_pres['Element2']))
        if not (min_pres['abundance2'].empty):
-          pres_abunds.append(float(min_pres['abundance2'] + (percentarray_s[i]*min_pres['abundance2'])))
+          pres_abunds.append(float((min_pres['abundance2'] + (percentarray_s[i]*min_pres['abundance2'])).iloc[0]))
        if not (min_pres['Element3'].empty):
           elems_present.append(str(min_pres['Element3']))
        if not (min_pres['abundance3'].empty):
-          pres_abunds.append(float(min_pres['abundance3'] + (percentarray_s[i]*min_pres['abundance3'])))
+          pres_abunds.append(float((min_pres['abundance3'] + (percentarray_s[i]*min_pres['abundance3'])).iloc[0]))
        if not (min_pres['Element4'].empty):
           elems_present.append(str(min_pres['Element4']))
        if not (min_pres['abundance4'].empty):
-          pres_abunds.append(float(min_pres['abundance4'] + (percentarray_s[i]*min_pres['abundance4'])))
+          pres_abunds.append(float((min_pres['abundance4'] + (percentarray_s[i]*min_pres['abundance4'])).iloc[0]))
        if not (min_pres['Element5'].empty):
           elems_present.append(str(min_pres['Element5']))
        if not (min_pres['abundance5'].empty):
-          pres_abunds.append(float(min_pres['abundance5'] + (percentarray_s[i]*min_pres['abundance5'])))
+          pres_abunds.append(float((min_pres['abundance5'] + (percentarray_s[i]*min_pres['abundance5'])).iloc[0]))
        if not (min_pres['Element6'].empty):
           elems_present.append(str(min_pres['Element6']))
        if not (min_pres['abundance6'].empty):
-          pres_abunds.append(float(min_pres['abundance6'] + (percentarray_s[i]*min_pres['abundance6'])))
+          pres_abunds.append(float((min_pres['abundance6'] + (percentarray_s[i]*min_pres['abundance6'])).iloc[0]))
        if not (min_pres['Element7'].empty):
           elems_present.append(str(min_pres['Element7']))
        if not (min_pres['abundance7'].empty):
-          pres_abunds.append(float(min_pres['abundance7'] + (percentarray_s[i]*min_pres['abundance7'])))
+          pres_abunds.append(float((min_pres['abundance7'] + (percentarray_s[i]*min_pres['abundance7'])).iloc[0]))
        if not (min_pres['Element8'].empty):
           elems_present.append(str(min_pres['Element8']))
        if not (min_pres['abundance8'].empty):
-          pres_abunds.append(float(min_pres['abundance8'] + (percentarray_s[i]*min_pres['abundance8'])))
+          pres_abunds.append(float((min_pres['abundance8'] + (percentarray_s[i]*min_pres['abundance8'])).iloc[0]))
 
     #print("Elements present:", elems_present)
     #print("Present abundances:", pres_abunds)
@@ -507,8 +508,8 @@ def make_lama(rockarray, percentarray, velocity_kms=None):
     lama_abund = np.array(molar_conc_norm).flatten().transpose()
     max_abund = max(lama_abund)
     ag_index = isotope_data.loc[isotope_data['Name']=='Silver']
-    ag107_amp = float((max_abund*ag_index['Abundance1(%)'])/100.0)
-    ag109_amp = float((max_abund*ag_index['Abundance2(%)'])/100.0)
+    ag107_amp = float(((max_abund*ag_index['Abundance1(%)'])/100.0).iloc[0])
+    ag109_amp = float(((max_abund*ag_index['Abundance2(%)'])/100.0).iloc[0])
     
 #append ag refernece values to isotope mass and abundance arrays
     iso_mass.append(107.0)

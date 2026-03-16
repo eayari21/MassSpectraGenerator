@@ -85,7 +85,7 @@ def annotate_isotopes(ax, x_plot, y_plot, isotope_labels):
         return
 
     top_y = ax.get_ylim()[1]
-    base_label_y = top_y * 1.08
+    base_label_y_axes = 1.02
     tick_fontsize = plt.rcParams.get("xtick.labelsize", 10)
     x_min, x_max = ax.get_xlim()
     x_span = max(x_max - x_min, 1.0)
@@ -105,27 +105,34 @@ def annotate_isotopes(ax, x_plot, y_plot, isotope_labels):
         label_x_positions = [max(x_min + 0.4, x - overflow) for x in label_x_positions]
 
     n_rows = 4
-    row_scale = 1.08
+    row_step = 0.06
     for idx, iso in enumerate(sorted_labels):
         mass = iso["mass"]
         label = iso["label"]
         label_x = label_x_positions[idx]
         row = idx % n_rows
-        label_y = base_label_y * (row_scale ** row)
+        label_y_axes = base_label_y_axes + row * row_step
         idx = int(np.argmin(np.abs(x_plot - mass)))
         peak_y = y_plot[idx]
         ax.vlines(mass, peak_y, top_y, color="#5a5a5a", linewidth=0.5, alpha=0.7)
         if abs(label_x - mass) > 0.03 * x_span:
-            ax.plot([mass, label_x], [top_y, label_y / 1.01], color="#5a5a5a", linewidth=0.5, alpha=0.7)
+            ax.plot(
+                [mass, label_x],
+                [top_y, top_y * 1.02],
+                color="#5a5a5a",
+                linewidth=0.5,
+                alpha=0.7,
+            )
         ax.text(
             label_x,
-            label_y,
+            label_y_axes,
             label,
             ha="center",
             va="bottom",
             fontsize=tick_fontsize,
             rotation=90,
             color="#3a3a3a",
+            transform=ax.get_xaxis_transform(),
             clip_on=False,
         )
 
@@ -624,17 +631,19 @@ if __name__ == "__main__":
         rock_row = rocks.loc[rocks["Mineral"] == min_name].iloc[0]
         formula = mineral_formula_from_rocks(rock_row, isotope_data)
 
-        x, y, isotopes = make_lama([min_name], [100])
+        velocity_kms = 20
+        x, y, isotopes = make_lama([min_name], [100], velocity_kms=velocity_kms)
         y = y[:-62]
         x_plot = x[:len(y)]
         y_plot = np.clip(y, 1e-6, None)
 
-        print_isotope_summary(min_name, formula, isotopes)
+        print_isotope_summary(min_name, formula, isotopes, velocity_kms=velocity_kms)
 
         fig, ax = plt.subplots()
         configure_apj_axes(ax, 0, float(np.nanmax(x_plot)))
         ax.plot(x_plot, y_plot, lw=1.15, c="#1f77b4")
         annotate_isotopes(ax, x_plot, y_plot, isotopes)
+        ax.text(0.02, 0.96, f"{velocity_kms} km/s", transform=ax.transAxes, ha="left", va="top", fontsize=9)
 
         output_png = f"../figures/single_mineral_spectra/{min_name}_apj.png"
         output_pdf = f"../figures/single_mineral_spectra/{min_name}_apj.pdf"

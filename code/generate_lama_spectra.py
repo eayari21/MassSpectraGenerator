@@ -80,19 +80,45 @@ def velocity_probability(symbol, velocity_kms):
 
 
 def annotate_isotopes(ax, x_plot, y_plot, isotope_labels):
-    """Draw isotope labels in top margin with vertical lines to corresponding peaks."""
-    top_y = ax.get_ylim()[1]
-    label_y = top_y * 1.15
-    tick_fontsize = plt.rcParams.get("xtick.labelsize", 10)
+    """Draw isotope labels while preventing overlaps in the top margin."""
+    if not isotope_labels:
+        return
 
-    for iso in isotope_labels:
+    top_y = ax.get_ylim()[1]
+    base_label_y = top_y * 1.08
+    tick_fontsize = plt.rcParams.get("xtick.labelsize", 10)
+    x_min, x_max = ax.get_xlim()
+    x_span = max(x_max - x_min, 1.0)
+
+    sorted_labels = sorted(isotope_labels, key=lambda iso: iso["mass"])
+    min_sep = 1.8  # minimum horizontal spacing in u between neighboring labels
+    label_x_positions = []
+    for idx, iso in enumerate(sorted_labels):
+        label_x = float(np.clip(iso["mass"], x_min + 0.4, x_max - 0.4))
+        if idx > 0:
+            label_x = max(label_x, label_x_positions[-1] + min_sep)
+        label_x_positions.append(label_x)
+
+    # Shift the whole set back into axis limits if right edge overflowed.
+    overflow = label_x_positions[-1] - (x_max - 0.4)
+    if overflow > 0:
+        label_x_positions = [max(x_min + 0.4, x - overflow) for x in label_x_positions]
+
+    n_rows = 4
+    row_scale = 1.08
+    for idx, iso in enumerate(sorted_labels):
         mass = iso["mass"]
         label = iso["label"]
+        label_x = label_x_positions[idx]
+        row = idx % n_rows
+        label_y = base_label_y * (row_scale ** row)
         idx = int(np.argmin(np.abs(x_plot - mass)))
         peak_y = y_plot[idx]
         ax.vlines(mass, peak_y, top_y, color="#5a5a5a", linewidth=0.5, alpha=0.7)
+        if abs(label_x - mass) > 0.03 * x_span:
+            ax.plot([mass, label_x], [top_y, label_y / 1.01], color="#5a5a5a", linewidth=0.5, alpha=0.7)
         ax.text(
-            mass,
+            label_x,
             label_y,
             label,
             ha="center",
@@ -476,14 +502,14 @@ def make_lama(rockarray, percentarray, velocity_kms=None):
     lama_abund = np.array(molar_conc_norm).flatten().transpose()
     max_abund = max(lama_abund)
     ag_index = isotope_data.loc[isotope_data['Name']=='Silver']
-    ag107_index = ag_index[ag_index['Mass1(u)'] == 107]
-    ag109_index = ag_index[ag_index['Mass2(u)'] == 109]
-    ag107_amp = (max_abund*ag_index['Abundance1(%)'])/100.0
-    ag109_amp = (max_abund*ag_index['Abundance2(%)'])/100.0
+    ag107_amp = float((max_abund*ag_index['Abundance1(%)'])/100.0)
+    ag109_amp = float((max_abund*ag_index['Abundance2(%)'])/100.0)
     
 #append ag refernece values to isotope mass and abundance arrays
-    iso_mass.append(107)
-    iso_mass.append(109)
+    iso_mass.append(107.0)
+    iso_mass.append(109.0)
+    n_isosyms.append("Ag")
+    n_isosyms.append("Ag")
  
     lama_abund = np.append(lama_abund,ag107_amp)
     lama_abund = np.append(lama_abund,ag109_amp)
@@ -534,7 +560,7 @@ def make_lama(rockarray, percentarray, velocity_kms=None):
     real_spectrum_t = real_spectrum_t/spec_max
 
     isotope_report = []
-    for sym, mass, amp in zip(n_isosyms, iso_mass[:-2], lama_abund[:-2]):
+    for sym, mass, amp in zip(n_isosyms, iso_mass, lama_abund):
         if sym and amp > 0:
             isotope_report.append({"label": f"{int(round(mass))}{sym}", "mass": float(mass), "amplitude": float(amp)})
 

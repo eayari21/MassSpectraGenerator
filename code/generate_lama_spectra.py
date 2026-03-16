@@ -13,6 +13,7 @@ import numpy as np
 import re
 import matplotlib.pyplot as plt
 from matplotlib.ticker import LogLocator, NullFormatter
+from collections import defaultdict
 
 # Improve figure defaults for publication output
 plt.rcParams.update({
@@ -51,6 +52,56 @@ def configure_apj_axes(ax, xmin, xmax):
 
     ax.grid(which="major", axis="both", linestyle="-", linewidth=0.4, alpha=0.25)
     ax.grid(which="minor", axis="y", linestyle=":", linewidth=0.3, alpha=0.2)
+
+
+def velocity_probability(symbol, velocity_kms):
+    """Deterministic line-appearance weighting from 10/50/90% velocity anchors."""
+    elements = {
+        "H": (6.6, 8.9, 12.0),
+        "C": (6.9, 9.8, 12.7),
+        "O": (12.2, 14.4, 17.0),
+        "Mg": (4.1, 5.5, 7.4),
+        "Al": (4.1, 5.7, 7.8),
+        "Si": (6.2, 8.5, 11.6),
+        "Ca": (3.9, 4.6, 5.5),
+        "Fe": (6.7, 8.4, 10.6),
+        "Na": (6.0, 8.0, 10.8),
+        "K": (5.5, 7.4, 9.8),
+    }
+    if symbol not in elements:
+        return 1.0
+
+    v10, v50, v90 = elements[symbol]
+    vals_x = np.array([v10, v50, v90], dtype=float)
+    vals_y = np.array([0.1, 0.5, 0.9], dtype=float)
+    coeff = np.polyfit(vals_x, vals_y, 2)
+    prob = np.polyval(coeff, velocity_kms)
+    return float(np.clip(prob, 0.0, 1.0))
+
+
+def annotate_isotopes(ax, x_plot, y_plot, isotope_labels):
+    """Draw isotope labels in top margin with vertical lines to corresponding peaks."""
+    top_y = ax.get_ylim()[1]
+    label_y = top_y * 1.15
+    tick_fontsize = plt.rcParams.get("xtick.labelsize", 10)
+
+    for iso in isotope_labels:
+        mass = iso["mass"]
+        label = iso["label"]
+        idx = int(np.argmin(np.abs(x_plot - mass)))
+        peak_y = y_plot[idx]
+        ax.vlines(mass, peak_y, top_y, color="#5a5a5a", linewidth=0.5, alpha=0.7)
+        ax.text(
+            mass,
+            label_y,
+            label,
+            ha="center",
+            va="bottom",
+            fontsize=tick_fontsize,
+            rotation=90,
+            color="#3a3a3a",
+            clip_on=False,
+        )
 
 #%%
 def safe_div(x,y):
@@ -123,7 +174,7 @@ def add_noise(signal):
 
 
 #%%   
-def make_lama(rockarray, percentarray):
+def make_lama(rockarray, percentarray, velocity_kms=None):
    
     """
     
@@ -416,7 +467,9 @@ def make_lama(rockarray, percentarray):
         hydrodex = -1
    
     for lp in range(len(n_rsf_names)):
-                molar_conc_norm[lp] = molar_conc_norm[lp]*float(n_rsf_vals[lp])
+        molar_conc_norm[lp] = molar_conc_norm[lp]*float(n_rsf_vals[lp])
+        if velocity_kms is not None:
+            molar_conc_norm[lp] *= velocity_probability(n_isosyms[lp], velocity_kms)
  
 
 #calculate silver (Ag) target reference peaks
@@ -480,56 +533,110 @@ def make_lama(rockarray, percentarray):
     spec_max = max(real_spectrum_t)
     real_spectrum_t = real_spectrum_t/spec_max
 
-    return domain, real_spectrum_t
+    isotope_report = []
+    for sym, mass, amp in zip(n_isosyms, iso_mass[:-2], lama_abund[:-2]):
+        if sym and amp > 0:
+            isotope_report.append({"label": f"{int(round(mass))}{sym}", "mass": float(mass), "amplitude": float(amp)})
+
+    return domain, real_spectrum_t, isotope_report
+
+
+def mineral_formula_from_rocks(rock_row, isotope_data):
+    """Estimate empirical formula from weight percentages in rocks.csv."""
+    parts = []
+    mole_values = []
+
+    for i in range(1, 9):
+        elem = rock_row.get(f"Element{i}")
+        abund = rock_row.get(f"abundance{i}")
+        if pd.isna(elem) or pd.isna(abund):
+            continue
+        elem = str(elem).strip()
+        abund = float(abund)
+        iso_pres = isotope_data.loc[isotope_data["Symbol"] == elem]
+        if iso_pres.empty:
+            continue
+        atomic_mass = float(iso_pres["Mass1(u)"].iloc[0])
+        moles = abund / atomic_mass
+        mole_values.append((elem, moles))
+
+    if not mole_values:
+        return "Unknown"
+
+    min_moles = min(m for _, m in mole_values if m > 0)
+    for elem, moles in mole_values:
+        ratio = moles / min_moles
+        if abs(ratio - round(ratio)) < 0.05:
+            txt = str(int(round(ratio)))
+        else:
+            txt = f"{ratio:.2f}"
+        parts.append(f"{elem}{txt if txt != '1' else ''}")
+    return "".join(parts)
+
+
+def print_isotope_summary(mineral, formula, isotope_report, velocity_kms=None):
+    context = f" @ {velocity_kms} km/s" if velocity_kms is not None else ""
+    print(f"\nMineral: {mineral}{context}")
+    print(f"Formula: {formula}")
+    print("Constituent isotopes (relative abundances):")
+    total_amp = sum(i["amplitude"] for i in isotope_report) or 1.0
+    by_iso = defaultdict(float)
+    for iso in isotope_report:
+        by_iso[iso["label"]] += iso["amplitude"]
+    for label, amp in sorted(by_iso.items(), key=lambda item: (-item[1], item[0])):
+        print(f"  - {label}: {100.0 * amp / total_amp:.2f}%")
 
 
 
 
 if __name__ == "__main__":
+    rocks = fetch_rocks()
+    isotope_data = fetch_abundances()
+    minerals = rocks["Mineral"].dropna().tolist()
 
-    min_name = "Anorthite"
+    for min_name in minerals:
+        rock_row = rocks.loc[rocks["Mineral"] == min_name].iloc[0]
+        formula = mineral_formula_from_rocks(rock_row, isotope_data)
 
-    # x,y = make_lama(['Albite','Anorthite'], [200/3,100/3])
-    x, y = make_lama([min_name], [100])
-    y = y[:-62]
+        x, y, isotopes = make_lama([min_name], [100])
+        y = y[:-62]
+        x_plot = x[:len(y)]
+        y_plot = np.clip(y, 1e-6, None)
 
-    # y = add_noise(y)
+        print_isotope_summary(min_name, formula, isotopes)
 
-    # Keep strictly positive values for log-space rendering
-    y_plot = np.clip(y, 1e-6, None)
-    x_min = 0
-    x_max = float(np.nanmax(x))
+        fig, ax = plt.subplots()
+        configure_apj_axes(ax, 0, float(np.nanmax(x_plot)))
+        ax.plot(x_plot, y_plot, lw=1.15, c="#1f77b4")
+        annotate_isotopes(ax, x_plot, y_plot, isotopes)
 
-    fig, ax = plt.subplots()
-    configure_apj_axes(ax, x_min, x_max)
+        output_png = f"../figures/single_mineral_spectra/{min_name}_apj.png"
+        output_pdf = f"../figures/single_mineral_spectra/{min_name}_apj.pdf"
+        fig.savefig(output_png, bbox_inches="tight")
+        fig.savefig(output_pdf, bbox_inches="tight")
+        plt.close(fig)
 
-    line_color = "#1f77b4"
-    ax.plot(x, y_plot, lw=1.15, c=line_color)
+    comparison_minerals = [minerals[0], minerals[1]]
+    velocities = [5, 10, 15, 20]
 
-    title = rf"{min_name} synthetic LAMA spectrum"
-    ax.set_title(title)
+    for mineral in comparison_minerals:
+        rock_row = rocks.loc[rocks["Mineral"] == mineral].iloc[0]
+        formula = mineral_formula_from_rocks(rock_row, isotope_data)
+        fig, axs = plt.subplots(2, 2, figsize=(8.5, 5.5), sharex=True, sharey=True)
 
-    # Annotate strongest peaks to improve interpretation in print.
-    candidate_idx = np.where(y_plot > 0.08 * np.max(y_plot))[0]
-    if len(candidate_idx) > 0:
-        candidate_idx = candidate_idx[np.argsort(y_plot[candidate_idx])[-8:]]
-        for idx in sorted(candidate_idx, key=lambda j: x[j]):
-            xm = x[idx]
-            ym = y_plot[idx]
-            # ax.vlines(xm, 1e-6, ym, colors=line_color, alpha=0.2, linewidth=0.6)
-            # ax.text(
-            #     xm,
-            #     ym * 1.18,
-            #     f"{xm:.1f}",
-            #     ha="center",
-            #     va="bottom",
-            #     fontsize=8,
-            #     color="#2f2f2f",
-            #     rotation=90,
-            # )
+        for ax, vel in zip(axs.ravel(), velocities):
+            x, y, isotopes = make_lama([mineral], [100], velocity_kms=vel)
+            y = y[:-62]
+            x_plot = x[:len(y)]
+            y_plot = np.clip(y, 1e-6, None)
+            print_isotope_summary(mineral, formula, isotopes, velocity_kms=vel)
+            configure_apj_axes(ax, 0, float(np.nanmax(x_plot)))
+            ax.plot(x_plot, y_plot, lw=1.0, c="#1f77b4")
+            annotate_isotopes(ax, x_plot, y_plot, isotopes)
+            ax.text(0.02, 0.96, f"{vel} km/s", transform=ax.transAxes, ha="left", va="top", fontsize=9)
 
-    output_png = f"../figures/single_mineral_spectra/{min_name}_apj.png"
-    output_pdf = f"../figures/single_mineral_spectra/{min_name}_apj.pdf"
-    fig.savefig(output_png, bbox_inches="tight")
-    fig.savefig(output_pdf, bbox_inches="tight")
-    plt.show()
+        output_png = f"../figures/single_mineral_spectra/{mineral}_velocity_grid.png"
+        output_pdf = f"../figures/single_mineral_spectra/{mineral}_velocity_grid.pdf"
+        fig.savefig(output_png, bbox_inches="tight")
+        fig.savefig(output_pdf, bbox_inches="tight")
+        plt.close(fig)

@@ -85,39 +85,18 @@ def annotate_isotopes(ax, x_plot, y_plot, isotope_labels):
     if not isotope_labels:
         return
 
-    fig = ax.figure
-    fig.canvas.draw()
-    renderer = fig.canvas.get_renderer()
     data_axes_transform = transforms.blended_transform_factory(ax.transData, ax.transAxes)
     top_y = ax.get_ylim()[1]
     base_label_y_axes = 1.02
     tick_fontsize = plt.rcParams.get("xtick.labelsize", 10)
     x_min, x_max = ax.get_xlim()
-    axis_bbox = ax.get_window_extent(renderer=renderer)
-    axis_width_px = max(axis_bbox.width, 1.0)
 
     sorted_labels = sorted(isotope_labels, key=lambda iso: iso["mass"])
-    label_widths_px = []
-    for iso in sorted_labels:
-        text = ax.text(
-            0,
-            0,
-            iso["label"],
-            fontsize=tick_fontsize,
-            rotation=90,
-            visible=False,
-        )
-        label_widths_px.append(text.get_window_extent(renderer=renderer).width)
-        text.remove()
-
-    default_sep_px = 18.0
-    data_per_px = (x_max - x_min) / axis_width_px
+    min_sep = 2.3  # minimum horizontal spacing in u between neighboring labels
     label_x_positions = []
     for idx, iso in enumerate(sorted_labels):
         label_x = float(np.clip(iso["mass"], x_min + 0.4, x_max - 0.4))
         if idx > 0:
-            min_sep_px = max(default_sep_px, 0.5 * (label_widths_px[idx - 1] + label_widths_px[idx]) + 4.0)
-            min_sep = min_sep_px * data_per_px
             label_x = max(label_x, label_x_positions[-1] + min_sep)
         label_x_positions.append(label_x)
 

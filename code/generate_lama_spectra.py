@@ -88,47 +88,28 @@ def annotate_isotopes(ax, x_plot, y_plot, isotope_labels):
     data_axes_transform = transforms.blended_transform_factory(ax.transData, ax.transAxes)
     top_y = ax.get_ylim()[1]
     base_label_y_axes = 1.02
-    row_step_axes = 0.08
     tick_fontsize = plt.rcParams.get("xtick.labelsize", 10)
     x_min, x_max = ax.get_xlim()
 
     sorted_labels = sorted(isotope_labels, key=lambda iso: iso["mass"])
     min_sep = 2.3  # minimum horizontal spacing in u between neighboring labels
-    row_assignments = []
-    row_last_positions = []
-
-    for iso in sorted_labels:
+    label_x_positions = []
+    for idx, iso in enumerate(sorted_labels):
         label_x = float(np.clip(iso["mass"], x_min + 0.4, x_max - 0.4))
-        row_idx = None
-        for candidate_idx, last_x in enumerate(row_last_positions):
-            if label_x >= last_x + min_sep:
-                row_idx = candidate_idx
-                break
-        if row_idx is None:
-            row_idx = len(row_last_positions)
-            row_last_positions.append(x_min + 0.4 - min_sep)
+        if idx > 0:
+            label_x = max(label_x, label_x_positions[-1] + min_sep)
+        label_x_positions.append(label_x)
 
-        label_x = max(label_x, row_last_positions[row_idx] + min_sep)
-        row_last_positions[row_idx] = label_x
-        row_assignments.append({"iso": iso, "label_x": label_x, "row_idx": row_idx})
+    # Shift the whole set back into axis limits if right edge overflowed.
+    overflow = label_x_positions[-1] - (x_max - 0.4)
+    if overflow > 0:
+        label_x_positions = [max(x_min + 0.4, x - overflow) for x in label_x_positions]
 
-    # Shift each row back into the plotting bounds if it overflowed on the right.
-    row_entries = defaultdict(list)
-    for entry in row_assignments:
-        row_entries[entry["row_idx"]].append(entry)
-
-    for entries in row_entries.values():
-        overflow = entries[-1]["label_x"] - (x_max - 0.4)
-        if overflow > 0:
-            for entry in entries:
-                entry["label_x"] = max(x_min + 0.4, entry["label_x"] - overflow)
-
-    for entry in row_assignments:
-        iso = entry["iso"]
+    for idx, iso in enumerate(sorted_labels):
         mass = iso["mass"]
         label = iso["label"]
-        label_x = entry["label_x"]
-        label_y_axes = base_label_y_axes + (entry["row_idx"] * row_step_axes)
+        label_x = label_x_positions[idx]
+        label_y_axes = base_label_y_axes
         idx = int(np.argmin(np.abs(x_plot - mass)))
         peak_y = y_plot[idx]
         ax.vlines(mass, peak_y, top_y, color="#5a5a5a", linewidth=0.5, alpha=0.7)

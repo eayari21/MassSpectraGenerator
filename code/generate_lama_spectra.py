@@ -88,28 +88,47 @@ def annotate_isotopes(ax, x_plot, y_plot, isotope_labels):
     data_axes_transform = transforms.blended_transform_factory(ax.transData, ax.transAxes)
     top_y = ax.get_ylim()[1]
     base_label_y_axes = 1.02
+    row_step_axes = 0.08
     tick_fontsize = plt.rcParams.get("xtick.labelsize", 10)
     x_min, x_max = ax.get_xlim()
 
     sorted_labels = sorted(isotope_labels, key=lambda iso: iso["mass"])
     min_sep = 2.3  # minimum horizontal spacing in u between neighboring labels
-    label_x_positions = []
-    for idx, iso in enumerate(sorted_labels):
+    row_assignments = []
+    row_last_positions = []
+
+    for iso in sorted_labels:
         label_x = float(np.clip(iso["mass"], x_min + 0.4, x_max - 0.4))
-        if idx > 0:
-            label_x = max(label_x, label_x_positions[-1] + min_sep)
-        label_x_positions.append(label_x)
+        row_idx = None
+        for candidate_idx, last_x in enumerate(row_last_positions):
+            if label_x >= last_x + min_sep:
+                row_idx = candidate_idx
+                break
+        if row_idx is None:
+            row_idx = len(row_last_positions)
+            row_last_positions.append(x_min + 0.4 - min_sep)
 
-    # Shift the whole set back into axis limits if right edge overflowed.
-    overflow = label_x_positions[-1] - (x_max - 0.4)
-    if overflow > 0:
-        label_x_positions = [max(x_min + 0.4, x - overflow) for x in label_x_positions]
+        label_x = max(label_x, row_last_positions[row_idx] + min_sep)
+        row_last_positions[row_idx] = label_x
+        row_assignments.append({"iso": iso, "label_x": label_x, "row_idx": row_idx})
 
-    for idx, iso in enumerate(sorted_labels):
+    # Shift each row back into the plotting bounds if it overflowed on the right.
+    row_entries = defaultdict(list)
+    for entry in row_assignments:
+        row_entries[entry["row_idx"]].append(entry)
+
+    for entries in row_entries.values():
+        overflow = entries[-1]["label_x"] - (x_max - 0.4)
+        if overflow > 0:
+            for entry in entries:
+                entry["label_x"] = max(x_min + 0.4, entry["label_x"] - overflow)
+
+    for entry in row_assignments:
+        iso = entry["iso"]
         mass = iso["mass"]
         label = iso["label"]
-        label_x = label_x_positions[idx]
-        label_y_axes = base_label_y_axes
+        label_x = entry["label_x"]
+        label_y_axes = base_label_y_axes + (entry["row_idx"] * row_step_axes)
         idx = int(np.argmin(np.abs(x_plot - mass)))
         peak_y = y_plot[idx]
         ax.vlines(mass, peak_y, top_y, color="#5a5a5a", linewidth=0.5, alpha=0.7)
@@ -656,10 +675,10 @@ if __name__ == "__main__":
     for mineral in comparison_minerals:
         rock_row = rocks.loc[rocks["Mineral"] == mineral].iloc[0]
         formula = mineral_formula_from_rocks(rock_row, isotope_data)
-        fig, axs = plt.subplots(2, 2, figsize=(8.5, 5.5), sharex=True, sharey=True)
-        fig.subplots_adjust(hspace=0.45, wspace=0.10)
+        fig, axs = plt.subplots(4, 1, figsize=(8.5, 10.5), sharex=True, sharey=True)
+        fig.subplots_adjust(hspace=0.55)
 
-        for ax, vel in zip(axs.ravel(), velocities):
+        for idx, (ax, vel) in enumerate(zip(axs, velocities)):
             x, y, isotopes = make_lama([mineral], [100], velocity_kms=vel)
             y = y[:-62]
             x_plot = x[:len(y)]
@@ -669,6 +688,8 @@ if __name__ == "__main__":
             ax.plot(x_plot, y_plot, lw=1.0, c="#1f77b4")
             annotate_isotopes(ax, x_plot, y_plot, isotopes)
             ax.text(0.02, 0.96, f"{vel} km/s", transform=ax.transAxes, ha="left", va="top", fontsize=9)
+            if idx < len(velocities) - 1:
+                ax.set_xlabel("")
 
         output_png = f"../figures/single_mineral_spectra/{mineral}_velocity_grid.png"
         output_pdf = f"../figures/single_mineral_spectra/{mineral}_velocity_grid.pdf"
